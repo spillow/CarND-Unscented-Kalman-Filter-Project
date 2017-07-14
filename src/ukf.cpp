@@ -11,61 +11,85 @@ using std::vector;
  * Initializes Unscented Kalman filter
  */
 UKF::UKF() {
-  // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = true;
+    /**
+    TODO:
 
-  // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = true;
+    Hint: one or more values initialized above might be wildly off...
+    */
 
-  // initial state vector
-  x_ = VectorXd(5);
-
-  // initial covariance matrix
-  P_ = MatrixXd(5, 5);
-
-  // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
-
-  // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
-
-  // Laser measurement noise standard deviation position1 in m
-  std_laspx_ = 0.15;
-
-  // Laser measurement noise standard deviation position2 in m
-  std_laspy_ = 0.15;
-
-  // Radar measurement noise standard deviation radius in m
-  std_radr_ = 0.3;
-
-  // Radar measurement noise standard deviation angle in rad
-  std_radphi_ = 0.03;
-
-  // Radar measurement noise standard deviation radius change in m/s
-  std_radrd_ = 0.3;
-
-  /**
-  TODO:
-
-  Complete the initialization. See ukf.h for other member properties.
-
-  Hint: one or more values initialized above might be wildly off...
-  */
+    // set weights
+    double weight_0 = lambda_ / (lambda_ + n_aug_);
+    weights_(0) = weight_0;
+    for (int i = 1; i < 2 * n_aug_ + 1; i++)
+    {
+        double weight = 0.5 / (n_aug_ + lambda_);
+        weights_(i) = weight;
+    }
 }
 
 UKF::~UKF() {}
+
+void UKF::InitFirstMeasurement(const MeasurementPackage &meas_package)
+{
+    VectorXd measures = meas_package.raw_measurements_;
+
+    P_ <<
+        1, 0, 0, 0, 0,       // px
+        0, 1, 0, 0, 0,       // py
+        0, 0, 15 * 15, 0, 0, // v   (assume bikes mostly stay under 15 m/s)
+        0, 0, 0, 6 * 6, 0,   // yaw (normalized angle |yaw| < 2pi ~ 6)
+        0, 0, 0, 0, 2 * 2;   // yaw rate (2pi rad/3 s ~ 2 max)?
+          
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
+    {
+        float rho = measures(0);
+        float theta = measures(1);
+        x_ << rho*cos(theta), rho*sin(theta), 0, 0, 0;
+    }
+    else if (meas_package.sensor_type_ == MeasurementPackage::LASER)
+    {
+        x_ << measures(0), measures(1), 0, 0, 0;
+    }
+    else
+    {
+        assert(0 && "unknown measurement type!");
+    }
+}
 
 /**
  * @param {MeasurementPackage} meas_package The latest measurement data of
  * either radar or laser.
  */
-void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
-  /**
-  TODO:
+void UKF::ProcessMeasurement(MeasurementPackage meas_package)
+{
+    long long currTime = meas_package.timestamp_;
+    long long prevTime = time_us_;
 
-  Complete this function! Make sure you switch between lidar and radar
-  measurements.
-  */
+    time_us_ = currTime;
+
+    if (!is_initialized_)
+    {
+        InitFirstMeasurement(meas_package);
+
+        is_initialized_ = true;
+        return;
+    }
+
+    const double dt = (double)(currTime - prevTime) / 1000000.0;
+
+    Prediction(dt);
+
+    switch (meas_package.sensor_type_)
+    {
+    case MeasurementPackage::RADAR:
+        UpdateRadar(meas_package);
+        break;
+    case MeasurementPackage::LASER:
+        UpdateLidar(meas_package);
+        break;
+    default:
+        assert(0 && "unknown measurement type!");
+    }
 }
 
 /**
