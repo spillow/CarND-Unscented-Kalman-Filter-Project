@@ -62,6 +62,8 @@ void UKF::InitFirstMeasurement(const MeasurementPackage &meas_package)
  */
 void UKF::ProcessMeasurement(MeasurementPackage meas_package)
 {
+    std::cout << "Got input!" << std::endl;
+
     long long currTime = meas_package.timestamp_;
     long long prevTime = time_us_;
 
@@ -90,6 +92,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
     default:
         assert(0 && "unknown measurement type!");
     }
+
+    std::cout << "Leaving!" << std::endl;
 }
 
 static MatrixXd AugmentedSigmaPoints(
@@ -183,6 +187,19 @@ static MatrixXd SigmaPointPrediction(
     return Xsig_pred;
 }
 
+static double Normalize(double angle)
+{
+    int k = (int)(angle / M_2_PI);
+    double shift = angle - (double)k * M_2_PI;
+
+    if (shift > M_PI)
+        shift -= M_2_PI;
+    else if (shift < -M_PI)
+        shift += M_2_PI;
+
+    return shift;
+};
+
 static std::pair<VectorXd, MatrixXd> PredictMeanAndCovariance(
     int n_x, int n_aug, double lambda,
     const MatrixXd &Xsig_pred, const MatrixXd &weights)
@@ -207,8 +224,7 @@ static std::pair<VectorXd, MatrixXd> PredictMeanAndCovariance(
         // state difference
         VectorXd x_diff = Xsig_pred.col(i) - x;
         //angle normalization
-        while (x_diff(3) > M_PI) x_diff(3) -= 2.*M_PI;
-        while (x_diff(3) < -M_PI) x_diff(3) += 2.*M_PI;
+        x_diff(3) = Normalize(x_diff(3));
 
         P = P + weights(i) * x_diff * x_diff.transpose();
     }
@@ -252,14 +268,12 @@ static void UpdateState(
         //residual
         VectorXd z_diff = Zsig.col(i) - z_pred;
         //angle normalization
-        while (z_diff(1)> M_PI) z_diff(1) -= 2.*M_PI;
-        while (z_diff(1)<-M_PI) z_diff(1) += 2.*M_PI;
+        z_diff(1) = Normalize(z_diff(1));
 
         // state difference
         VectorXd x_diff = Xsig_pred.col(i) - x;
         //angle normalization
-        while (x_diff(3)> M_PI) x_diff(3) -= 2.*M_PI;
-        while (x_diff(3)<-M_PI) x_diff(3) += 2.*M_PI;
+        x_diff(3) = Normalize(x_diff(3));
 
         Tc += weights(i) * x_diff * z_diff.transpose();
     }
@@ -271,8 +285,7 @@ static void UpdateState(
     VectorXd z_diff = z - z_pred;
 
     //angle normalization
-    while (z_diff(1)> M_PI) z_diff(1) -= 2.*M_PI;
-    while (z_diff(1)<-M_PI) z_diff(1) += 2.*M_PI;
+    z_diff(1) = Normalize(z_diff(1));
 
     //update state mean and covariance matrix
     x += K * z_diff;
@@ -308,8 +321,7 @@ static std::pair<VectorXd, MatrixXd> PredictMeasurement(
         VectorXd z_diff = Zsig.col(i) - z_pred;
 
         //angle normalization
-        while (z_diff(1)> M_PI) z_diff(1) -= 2.*M_PI;
-        while (z_diff(1)<-M_PI) z_diff(1) += 2.*M_PI;
+        z_diff(1) = Normalize(z_diff(1));
 
         S += weights(i) * z_diff * z_diff.transpose();
     }
@@ -359,14 +371,22 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         double v   = Xpred(2);
         double yaw = Xpred(3);
 
+        double denom = sqrt(p_x*p_x + p_y*p_y);
+
+        if (fabs(denom) < 0.0001)
+        {
+            std::cout << "h() - Division by Zero" << std::endl;
+            return VectorXd(3, 1);
+        }
+
         double v1 = cos(yaw)*v;
         double v2 = sin(yaw)*v;
 
         // measurement model
         VectorXd zpred(3);
-        zpred << sqrt(p_x*p_x + p_y*p_y), // r
+        zpred << denom, // r
                  atan2(p_y, p_x),         // phi
-                 (p_x*v1 + p_y*v2) / sqrt(p_x*p_x + p_y*p_y); // r_dot
+                 (p_x*v1 + p_y*v2) / denom; // r_dot
 
         return zpred;
     };
