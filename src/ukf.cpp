@@ -32,10 +32,10 @@ void UKF::InitFirstMeasurement(const MeasurementPackage &meas_package)
     double yawd = 2;
 
     P_ <<
-        .8, 0, 0, 0, 0,         // px
-        0, .8, 0, 0, 0,         // py
-        0, 0, v*v, 0, 0,       // v   (assume bikes mostly stay under 15 m/s)
-        0, 0, 0, yaw*yaw, 0,   // yaw (normalized angle |yaw| < 2pi ~ 6)
+        .4, 0, 0, 0, 0,        // px
+        0, .4, 0, 0, 0,        // py
+        0, 0, v*v, 0, 0,       // v   (assume bikes mostly stay under 8 m/s)
+        0, 0, 0, yaw*yaw, 0,   // yaw (normalized angle |yaw|)
         0, 0, 0, 0, yawd*yawd; // yaw rate (2pi rad/3 s ~ 2 max)?
           
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
