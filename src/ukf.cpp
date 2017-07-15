@@ -27,12 +27,16 @@ void UKF::InitFirstMeasurement(const MeasurementPackage &meas_package)
 {
     VectorXd measures = meas_package.raw_measurements_;
 
+    double v = 8;
+    double yaw = 4;
+    double yawd = 2;
+
     P_ <<
-        1, 0, 0, 0, 0,       // px
-        0, 1, 0, 0, 0,       // py
-        0, 0, 15 * 15, 0, 0, // v   (assume bikes mostly stay under 15 m/s)
-        0, 0, 0, 6 * 6, 0,   // yaw (normalized angle |yaw| < 2pi ~ 6)
-        0, 0, 0, 0, 2 * 2;   // yaw rate (2pi rad/3 s ~ 2 max)?
+        .8, 0, 0, 0, 0,         // px
+        0, .8, 0, 0, 0,         // py
+        0, 0, v*v, 0, 0,       // v   (assume bikes mostly stay under 15 m/s)
+        0, 0, 0, yaw*yaw, 0,   // yaw (normalized angle |yaw| < 2pi ~ 6)
+        0, 0, 0, 0, yawd*yawd; // yaw rate (2pi rad/3 s ~ 2 max)?
           
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
     {
